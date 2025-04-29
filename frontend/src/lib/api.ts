@@ -1,62 +1,89 @@
-import { Task } from '@/types'; 
+import { Task } from '@/types';
 
-const API_BASE_URL = 'http://localhost:5000/api/tasks';
+const API_URL = 'http://localhost:5000/api';
 
-async function handleResponse<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    
-    const errorData = await response.json().catch(() => ({ message: response.statusText }));
-    throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
-  }
-  return response.json() as Promise<T>;
+interface TaskData {
+  description?: string;
+  dueDate?: string;
+  priority?: 'Low' | 'Medium' | 'High';
+  tags?: string[];
 }
 
-export const fetchTasks = async (): Promise<Task[]> => {
-  const response = await fetch(API_BASE_URL);
-  return handleResponse<Task[]>(response);
+const handleApiError = (error: unknown) => {
+  console.error('API Error:', error);
+  
+  if (error instanceof Response) {
+    throw new Error(`API error: ${error.status} ${error.statusText}`);
+  } else if (error instanceof Error) {
+    throw error;
+  } else {
+    throw new Error('Unknown API error occurred');
+  }
 };
 
-export const addTask = async (title: string): Promise<Task> => {
-    if (!title.trim()) {
-        throw new Error("Task title cannot be empty.");
-    }
-    const response = await fetch(API_BASE_URL, {
-        method: 'POST',
-        headers: {
+export async function fetchTasks(): Promise<Task[]> {
+  try {
+    const response = await fetch(`${API_URL}/tasks`);
+    if (!response.ok) throw response;
+    
+    const tasks = await response.json();
+    return tasks;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function addTask(title: string, data?: TaskData): Promise<Task> {
+  try {
+    const response = await fetch(`${API_URL}/tasks`, {
+      method: 'POST',
+      headers: {
         'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title }),
+      },
+      body: JSON.stringify({
+        title,
+        ...data
+      }),
     });
-    return handleResponse<Task>(response);
-};
+    
+    if (!response.ok) throw response;
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
 
-
-export const updateTask = async (id: string, updates: Partial<Pick<Task, 'title' | 'completed'>>): Promise<Task> => {
-
-    if (updates.title !== undefined && !updates.title.trim()) {
-         throw new Error("Task title cannot be empty.");
-    }
-    const response = await fetch(`${API_BASE_URL}/${id}`, {
-        method: 'PUT',
-        headers: {
+export async function updateTask(taskId: string, data: Partial<Task>): Promise<Task> {
+  try {
+    const response = await fetch(`${API_URL}/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: {
         'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updates),
+      },
+      body: JSON.stringify(data),
     });
-    return handleResponse<Task>(response);
-};
+    
+    if (!response.ok) throw response;
+    return await response.json();
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
 
+export async function deleteTask(taskId: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_URL}/tasks/${taskId}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) throw response;
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
 
-export const deleteTask = async (id: string): Promise<{ message: string; taskId: string }> => {
-  const response = await fetch(`${API_BASE_URL}/${id}`, {
-    method: 'DELETE',
+export async function toggleTaskCompletion(taskId: string, currentStatus: boolean): Promise<Task> {
+  return updateTask(taskId, {
+    completed: !currentStatus
   });
-   if (response.status === 204) {
-     return { message: 'Task deleted successfully', taskId: id };
-   }
-  return handleResponse<{ message: string; taskId: string }>(response);
-};
-
-export const toggleTaskCompletion = async (id: string, currentStatus: boolean): Promise<Task> => {
-    return updateTask(id, { completed: !currentStatus });
-};
+}
