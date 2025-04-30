@@ -4,13 +4,15 @@ import { fetchTasks } from '@/lib/api';
 import { AddTaskForm } from '@/components/AddTaskForm';
 import { TaskList } from '@/components/TaskList';
 import { ModeToggle } from "@/components/theme/mode-toggle";
-import { toast } from 'sonner';
+import { toast, Toaster } from 'sonner';
+import { Button } from "@/components/ui/button";
+import { RefreshCcw, CheckCircle2 } from 'lucide-react';
 
 function App() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [deletedTaskTitle, setDeletedTaskTitle] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadTasks = useCallback(async () => {
     setIsLoading(true);
@@ -22,7 +24,9 @@ function App() {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch tasks';
       console.error(errorMessage, err);
       setError(errorMessage);
-      toast.error(errorMessage);
+      toast.error("Failed to load tasks", {
+        description: errorMessage,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -34,7 +38,10 @@ function App() {
 
   const handleTaskAdded = (newTask: Task) => {
     setTasks((prevTasks) => [newTask, ...prevTasks]);
-    toast.success(`Task "${newTask.title}" added successfully.`);
+    toast.success(`Task added`, {
+      description: `"${newTask.title}" has been added to your tasks.`,
+      icon: <CheckCircle2 className="h-4 w-4" />,
+    });
   };
 
   const handleTaskUpdated = (updatedTask: Task) => {
@@ -43,54 +50,88 @@ function App() {
         task._id === updatedTask._id ? updatedTask : task
       )
     );
-    toast.info(`Task "${updatedTask.title}" updated.`);
+    toast.info(`Task updated`, {
+      description: `Changes to "${updatedTask.title}" have been saved.`,
+    });
   };
 
   const handleTaskDeleted = (taskId: string, taskTitle: string) => {
     setTasks((prevTasks) => prevTasks.filter((task) => task._id !== taskId));
-    
-    toast.success(`Task "${taskTitle}" deleted successfully.`, {
-      description: 'Task has been permanently removed.',
-      duration: 6000,
+    toast.success(`Task deleted`, {
+      description: `"${taskTitle}" has been removed from your tasks.`,
+      duration: 5000,
       action: {
-        label: "Dismiss",
-        onClick: () => setDeletedTaskTitle(null),
+        label: "Undo",
+        onClick: () => {
+          // This would require implementing an undelete functionality in your API
+          toast("Restore functionality would go here", {
+            description: "This is just a placeholder for the undo feature.",
+          });
+        },
       },
-      position: "bottom-center",
-      className: "border-l-4 border-green-500 pl-4",
     });
-    
-    setTimeout(() => setDeletedTaskTitle(null), 6000);
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadTasks();
+    setRefreshing(false);
+  };
+
+  const activeTasks = tasks.filter(task => !task.completed).length;
+  const completedTasks = tasks.filter(task => task.completed).length;
+
   return (
-    <div className="container mx-auto p-4 pt-6 md:pt-12 min-h-screen flex flex-col items-center">
-      <div className="absolute top-4 right-4">
-        <ModeToggle />
-      </div>
-
-      <h1 className="text-3xl font-bold mb-6 text-center">Quest</h1>
-
-      <AddTaskForm onTaskAdded={handleTaskAdded} />
-
-      <TaskList
-        tasks={tasks}
-        onTaskUpdated={handleTaskUpdated}
-        onTaskDeleted={(taskId) => handleTaskDeleted(taskId, tasks.find(task => task._id === taskId)?.title || '')}
-        isLoading={isLoading}
-        error={error}
-      />
-      
-      {deletedTaskTitle && (
-        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4 shadow-lg text-sm text-green-800 dark:text-green-300 animate-in fade-in slide-in-from-bottom duration-300 z-50">
-          <div className="flex items-center">
-            <svg className="w-5 h-5 mr-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-            <span className="font-medium">Task "<span className="font-semibold">{deletedTaskTitle}</span>" has been deleted</span>
+    <div className="min-h-screen bg-background">
+      <div className="container mx-auto p-4 max-w-2xl">
+        <header className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-3xl font-bold">Quest</h1>
           </div>
-        </div>
-      )}
+          <div className="flex items-center space-x-2">
+            <Button 
+              variant="outline" 
+              size="icon"
+              onClick={handleRefresh}
+              disabled={refreshing || isLoading}
+              title="Refresh tasks"
+              className="h-8 w-8"
+              aria-label="Refresh tasks"
+            >
+              <RefreshCcw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <ModeToggle />
+          </div>
+        </header>
+
+        <main className="space-y-4 items-center">
+          <div className="bg-card rounded-lg border shadow-sm p-4">
+            <AddTaskForm onTaskAdded={handleTaskAdded} />
+          </div>
+
+          {tasks.length > 0 && !isLoading && !error && (
+            <div className="flex justify-between items-center px-1">
+              <div className="text-sm text-muted-foreground">
+                {activeTasks} active, {completedTasks} completed
+              </div>
+            </div>
+          )}
+
+          <TaskList
+            tasks={tasks}
+            onTaskUpdated={handleTaskUpdated}
+            onTaskDeleted={handleTaskDeleted}
+            isLoading={isLoading}
+            error={error}
+          />
+        </main>
+
+        <footer className="mt-8 mb-4 text-center text-xs text-muted-foreground">
+          <p>© {new Date().getFullYear()} Quest </p>
+        </footer>
+      </div>
+      
+      <Toaster />
     </div>
   );
 }
