@@ -116,7 +116,7 @@
       <br>
       <img src="public\assets\Jasmine.jpg" width="100" height="100" style="border-radius: 50%"/>
       <br>
-      <b>Jasmine Manansala</b>x
+      <b>Jasmine Manansala</b>
       <br>
       <sub><code>Test Strategy | Quality Standards</code></sub>
       <br>
